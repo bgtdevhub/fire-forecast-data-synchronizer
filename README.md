@@ -44,6 +44,12 @@ Update the feature server URL
 const featureServerUrl = 'xx';
 ```
 
+Update the feature server URLs needed to update the time extent cache (optional)
+
+```javascript
+const fsUrlsForTimeExtentCacheUpdate = ['xx', 'xx'];
+```
+
 ### Deploy to AWS Lambda
 
 ```

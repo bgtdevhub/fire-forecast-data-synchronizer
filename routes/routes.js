@@ -4,6 +4,7 @@ const moment = require('moment');
 const client_id = '';
 const client_secret = '';
 const featureServerUrl = '';
+const fsUrlsForTimeExtentCacheUpdate = [];
 const featureServerUrlApplyEdit = `${featureServerUrl}/applyEdits`;
 const oauth2Url = 'https://www.arcgis.com/sharing/rest/oauth2/token/';
 const sourceUrl = 'https://data.emergency.vic.gov.au/Show?pageId=getFDRTFBJSON';
@@ -79,6 +80,23 @@ const applyEdit = (updateData, token) =>
     );
   });
 
+const updateTimeExtentCache = (url, token) => new Promise((resolve, reject) => {
+  request(
+    {
+      url: `${url}?token=${token}&returnUpdates=True&f=json`,
+      headers: {},
+      method: 'GET',
+      encoding: null
+    },
+    function (error, res, body) {
+      if (res.statusCode == 200 && !error) {
+        console.log(`updates time extent cache: ${JSON.stringify(body)}`)
+        resolve(JSON.parse(body));
+      }
+      reject(error);
+    }
+  );
+});
 
 const requestToken = () =>
   // generate a token with client id and client secret
@@ -103,7 +121,6 @@ const requestToken = () =>
     );
   });
 
-
 const appRouter = app => {
   app.get('/', async (req, res) => {
     console.log("Synchronization started.")
@@ -124,11 +141,10 @@ const appRouter = app => {
 
         const existingUpdate = arrUpdates.find(x => x.issueFor === issueForDate);
 
-        if (!existingUpdate)
-        {
+        if (!existingUpdate) {
           element.declareList.forEach(declare => {
             const currentFeature = featureData.features.find(x => x.attributes.TFB_DIST.toLowerCase() === declare.name.toLowerCase() && x.attributes.ForecastID === index + 1);
-            
+
             if (element.issueAt && !element.status) {
               arrUpdates.push({
                 objectId: currentFeature.attributes.OBJECTID,
@@ -153,7 +169,7 @@ const appRouter = app => {
         } else {
           element.declareList.forEach(declare => {
             const currentFeature = featureData.features.find(x => x.attributes.TFB_DIST.toLowerCase() === declare.name.toLowerCase() && x.attributes.ForecastID === existingUpdate.forecastId);
-            
+
             const currentUpdateIndex = arrUpdates.findIndex(x => x.objectId === currentFeature.attributes.OBJECTID);
 
             if (element.issueAt && !element.status) {
@@ -165,8 +181,12 @@ const appRouter = app => {
           });
         }
       });
-      
+
       const result = await applyEdit(arrUpdates, token);
+
+      fsUrlsForTimeExtentCacheUpdate.forEach(async url => {
+        await updateTimeExtentCache(url, token);
+      });
 
       res
         .status(200)
